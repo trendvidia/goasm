@@ -225,8 +225,9 @@ func (e *AMD64Encoder) encodeArithmetic(method string, ops []string, params []Pa
 	dst, src := ops[0], ops[1]
 	if strings.HasPrefix(src, "#") || isParam(src, params) {
 		val := strings.TrimPrefix(src, "#")
-		return fmt.Sprintf("e.%sImm(%s, %s, uint32(%s))", method, e.regOrParam(dst, params), e.regOrParam(dst, params), val), nil
+		return fmt.Sprintf("e.%sImm(%s, %s, uint64(%s))", method, e.regOrParam(dst, params), e.regOrParam(dst, params), val), nil
 	}
+
 	if strings.HasPrefix(src, "[") {
 		mem := src[1 : len(src)-1]
 		base, idx, scale, disp, err := e.parseMem(mem, params)
@@ -259,11 +260,20 @@ func (e *AMD64Encoder) encodeShift(method string, ops []string, params []Paramet
 
 
 func (e *AMD64Encoder) encodeFloat(method string, ops []string, params []Parameter) (string, error) {
-	if len(ops) == 2 {
-		return fmt.Sprintf("e.%s(%s, %s)", method, e.regOrParam(ops[0], params), e.regOrParam(ops[1], params)), nil
+	if method == "FnegD" {
+		if len(ops) != 2 { return "", fmt.Errorf("FnegD requires 2 operands") }
+		return fmt.Sprintf("e.FnegD(%s, %s)", e.regOrParam(ops[0], params), e.regOrParam(ops[1], params)), nil
 	}
-	return fmt.Sprintf("e.%s(%s, %s, %s)", method, e.regOrParam(ops[0], params), e.regOrParam(ops[1], params), e.regOrParam(ops[2], params)), nil
+	if len(ops) == 2 {
+		return fmt.Sprintf("e.%s(%s, %s, %s)", method, e.regOrParam(ops[0], params), e.regOrParam(ops[0], params), e.regOrParam(ops[1], params)), nil
+	}
+	if len(ops) == 3 {
+		return fmt.Sprintf("e.%s(%s, %s, %s)", method, e.regOrParam(ops[0], params), e.regOrParam(ops[1], params), e.regOrParam(ops[2], params)), nil
+	}
+	return "", fmt.Errorf("invalid operands for float %s: %v", method, ops)
 }
+
+
 
 func (e *AMD64Encoder) encodeBranch(ops []string, params []Parameter) (string, error) {
 	if len(ops) != 1 {
@@ -283,10 +293,21 @@ func (e *AMD64Encoder) encodeBranch(ops []string, params []Parameter) (string, e
 
 func (e *AMD64Encoder) regOrParam(op string, params []Parameter) string {
 	if isParam(op, params) {
-		return op
+		pType := ""
+		for _, p := range params {
+			if p.Name == op {
+				pType = p.Type
+				break
+			}
+		}
+		if pType == "int" {
+			return op
+		}
+		return fmt.Sprintf("int(%s)", op)
 	}
 	return regToNumAMD64(op)
 }
+
 
 func regToNumAMD64(reg string) string {
 	regs := map[string]string{
@@ -306,7 +327,9 @@ func (e *AMD64Encoder) condToCode(cond string, params []Parameter) string {
 	}
 	condMap := map[string]string{
 		"EQ": "CondEQ", "NE": "CondNE", "LT": "CondLT", "LE": "CondLE", "GT": "CondGT", "GE": "CondGE",
+		"LO": "CondLO", "LS": "CondLS", "HI": "CondHI", "HS": "CondHS",
 	}
+
 	if code, ok := condMap[cond]; ok {
 		return code
 	}

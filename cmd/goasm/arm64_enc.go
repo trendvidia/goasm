@@ -343,10 +343,11 @@ func (e *ARM64Encoder) encodeArithmetic(mnemonic string, ops []string, params []
 	case "ORN": method = "Orn"
 	}
 	if isImm {
-		return fmt.Sprintf("e.%sImm(%s, %s, uint32(%s))", method, e.regOrParam(rd, params, 0), e.regOrParam(rn, params, 0), e.regOrParam(immVal, params, 0)), nil
+		return fmt.Sprintf("e.%sImm(%s, %s, uint64(%s))", method, e.regOrParam(rd, params, 0), e.regOrParam(rn, params, 0), e.regOrParam(immVal, params, 0)), nil
 	}
 	return fmt.Sprintf("e.%sReg(%s, %s, %s)", method, e.regOrParam(rd, params, 0), e.regOrParam(rn, params, 0), e.regOrParam(rm, params, 0)), nil
 }
+
 
 func (e *ARM64Encoder) encodeMultiply(ops []string, params []Parameter) (string, error) {
 	if len(ops) != 3 {
@@ -391,13 +392,7 @@ func (e *ARM64Encoder) encodeCset(ops []string, params []Parameter) (string, err
 		return "", fmt.Errorf("invalid operands for CSET: %v", ops)
 	}
 	rd, cond := ops[0], ops[1]
-	condStr := cond
-	if !isParam(cond, params) {
-		condStr = fmt.Sprintf("condToCode(\"%s\")", cond)
-	} else {
-		condStr = fmt.Sprintf("condToCode(%s)", cond)
-	}
-	return fmt.Sprintf("e.Cset(%s, int(%s))", e.regOrParam(rd, params, 0), condStr), nil
+	return fmt.Sprintf("e.Cset(%s, int(%s))", e.regOrParam(rd, params, 0), e.condToCode(cond, params)), nil
 }
 
 func (e *ARM64Encoder) encodeCsel(ops []string, params []Parameter) (string, error) {
@@ -405,28 +400,21 @@ func (e *ARM64Encoder) encodeCsel(ops []string, params []Parameter) (string, err
 		return "", fmt.Errorf("invalid operands for CSEL: %v", ops)
 	}
 	rd, rn, rm, cond := ops[0], ops[1], ops[2], ops[3]
-	condStr := cond
-	if !isParam(cond, params) {
-		condStr = fmt.Sprintf("condToCode(\"%s\")", cond)
-	} else {
-		condStr = fmt.Sprintf("condToCode(%s)", cond)
-	}
-	return fmt.Sprintf("e.Csel(%s, %s, %s, int(%s))", e.regOrParam(rd, params, 0), e.regOrParam(rn, params, 0), e.regOrParam(rm, params, 0), condStr), nil
+	return fmt.Sprintf("e.Csel(%s, %s, %s, int(%s))", e.regOrParam(rd, params, 0), e.regOrParam(rn, params, 0), e.regOrParam(rm, params, 0), e.condToCode(cond, params)), nil
 }
 
 func (e *ARM64Encoder) condToCode(cond string, params []Parameter) string {
 	if isParam(cond, params) {
-		return cond
+		return fmt.Sprintf("condToCode(%s)", cond)
 	}
 	condMap := map[string]string{
-		"EQ": "0", "NE": "1", "CS": "2", "HS": "2", "CC": "3", "LO": "3",
-		"MI": "4", "PL": "5", "VS": "6", "VC": "7", "HI": "8", "LS": "9",
-		"GE": "10", "LT": "11", "GT": "12", "LE": "13", "AL": "14", "NV": "15",
+		"EQ": "CondEQ", "NE": "CondNE", "LT": "CondLT", "LE": "CondLE", "GT": "CondGT", "GE": "CondGE",
+		"LO": "CondLO", "LS": "CondLS", "HI": "CondHI", "HS": "CondHS",
 	}
 	if code, ok := condMap[cond]; ok {
 		return code
 	}
-	return cond
+	return fmt.Sprintf("condToCode(\"%s\")", cond)
 }
 
 func (e *ARM64Encoder) encodeBranch(mnemonic string, ops []string, params []Parameter) (string, error) {
@@ -443,19 +431,17 @@ func (e *ARM64Encoder) encodeBranch(mnemonic string, ops []string, params []Para
 		if target == "0" && retVar != "" {
 			return fmt.Sprintf("%s = e.BPlaceholder()", retVar), nil
 		}
-		if isParam(target, params) {
-			return fmt.Sprintf("e.B(e.Len(), int(%s))", target), nil
-		}
 		return fmt.Sprintf("// TODO: Branch to %s", target), nil
 	}
 	if strings.HasPrefix(mnemonic, "B.") {
 		condStr := strings.TrimPrefix(mnemonic, "B.")
 		if target == "0" && retVar != "" {
-			return fmt.Sprintf("%s = e.BcondPlaceholder(int(condToCode(\"%s\")))", retVar, condStr), nil
+			return fmt.Sprintf("%s = e.BcondPlaceholder(int(%s))", retVar, e.condToCode(condStr, params)), nil
 		}
 	}
 	return "", fmt.Errorf("unsupported branch format: %s %v", mnemonic, ops)
 }
+
 
 func isParam(name string, params []Parameter) bool {
 	for _, p := range params {

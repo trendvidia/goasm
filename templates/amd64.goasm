@@ -1,20 +1,29 @@
 # ALIAS CTX = R15
-# ALIAS BP = R12
-# ALIAS SP = R13
-# ALIAS CONST = RBX
+# ALIAS STACK = R13
+# ALIAS SP = R12
+# ALIAS BP = RBX
+# ALIAS CONST = RSI
 # ALIAS TAG_INT = R8
 
 # TEMPLATE AddLocalsInt(dst uint8, src1 uint8, src2 uint8)
-    MOV  RAX, [BP + src1*8]
-    ADD  RAX, [BP + src2*8]
+    MOV  RAX, src1
+    MOV  RAX, [BP + RAX*8]
+    MOV  RCX, src2
+    MOV  RCX, [BP + RCX*8]
+    ADD  RAX, RCX
     SUB  RAX, TAG_INT
-    MOV  [BP + dst*8], RAX
+    MOV  RCX, dst
+    MOV  [BP + RCX*8], RAX
 
 # TEMPLATE IncrLocalInt(slot uint8, constIdx uint16)
-    MOV  RAX, [BP + slot*8]
-    ADD  RAX, [CONST + constIdx*8]
+    MOV  RAX, slot
+    MOV  RAX, [BP + RAX*8]
+    MOV  RCX, constIdx
+    MOV  RCX, [CONST + RCX*8]
+    ADD  RAX, RCX
     SUB  RAX, TAG_INT
-    MOV  [BP + slot*8], RAX
+    MOV  RCX, slot
+    MOV  [BP + RCX*8], RAX
 
 # TEMPLATE PushInt(reg int)
     MOV  [SP], reg
@@ -25,14 +34,16 @@
     MOV  reg, [SP]
 
 # TEMPLATE LoadLocal(slot uint8)
-    MOV  RAX, [BP + slot*8]
+    MOV  RAX, slot
+    MOV  RAX, [BP + RAX*8]
     MOV  [SP], RAX
     ADD  SP, 8
 
 # TEMPLATE StoreLocal(slot uint8)
     SUB  SP, 8
     MOV  RAX, [SP]
-    MOV  [BP + slot*8], RAX
+    MOV  RCX, slot
+    MOV  [BP + RCX*8], RAX
 
 # TEMPLATE AddInt()
     SUB  SP, 8
@@ -284,7 +295,6 @@
     MOV  [SP], RAX
     ADD  SP, 8
 
-
 # TEMPLATE IntToFloat()
     SUB  SP, 8
     MOV  RAX, [SP]
@@ -315,7 +325,8 @@
     MOV  [SP - 16], RAX
 
 # TEMPLATE LoadConst(idx uint16)
-    MOV  RAX, [CONST + idx*8]
+    MOV  RAX, idx
+    MOV  RAX, [CONST + RAX*8]
     MOV  [SP], RAX
     ADD  SP, 8
 
@@ -323,7 +334,6 @@
     MOV  RAX, val
     MOV  [SP], RAX
     ADD  SP, 8
-
 
 # TEMPLATE Push(reg int)
     MOV  [SP], reg
@@ -370,16 +380,15 @@
 
 # TEMPLATE NativeCall(moduleID uint16, funcID uint16, argCount uint8)
     SaveCallRegs
-    # System V ABI: RDI=ctx, RSI=moduleID, RDX=funcID, RCX=argCount
+    # ctx in RegCtx (R15).
     MOV  RDI, CTX
     MOV  RSI, moduleID
     MOV  RDX, funcID
     MOV  RCX, argCount
-    # Load helper addr from context
+    # Load helper addr from context (OffNativeCall is 104)
     MOV  RAX, [CTX + 104]
     CALL RAX
     RestoreCallRegs
-
 
 # TEMPLATE Halt()
     RET
