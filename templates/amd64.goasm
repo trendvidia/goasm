@@ -1,0 +1,385 @@
+# ALIAS CTX = R15
+# ALIAS BP = R12
+# ALIAS SP = R13
+# ALIAS CONST = RBX
+# ALIAS TAG_INT = R8
+
+# TEMPLATE AddLocalsInt(dst uint8, src1 uint8, src2 uint8)
+    MOV  RAX, [BP + src1*8]
+    ADD  RAX, [BP + src2*8]
+    SUB  RAX, TAG_INT
+    MOV  [BP + dst*8], RAX
+
+# TEMPLATE IncrLocalInt(slot uint8, constIdx uint16)
+    MOV  RAX, [BP + slot*8]
+    ADD  RAX, [CONST + constIdx*8]
+    SUB  RAX, TAG_INT
+    MOV  [BP + slot*8], RAX
+
+# TEMPLATE PushInt(reg int)
+    MOV  [SP], reg
+    ADD  SP, 8
+
+# TEMPLATE PopInt(reg int)
+    SUB  SP, 8
+    MOV  reg, [SP]
+
+# TEMPLATE LoadLocal(slot uint8)
+    MOV  RAX, [BP + slot*8]
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE StoreLocal(slot uint8)
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    MOV  [BP + slot*8], RAX
+
+# TEMPLATE AddInt()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    ADD  RAX, RCX
+    SUB  RAX, TAG_INT
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE SubInt()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    SUB  RAX, RCX
+    ADD  RAX, TAG_INT
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE MulInt()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    SBFX RAX, RAX, 0, 48
+    SBFX RCX, RCX, 0, 48
+    IMUL RAX, RCX
+    OR   RAX, TAG_INT
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE NegInt()
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    SBFX RAX, RAX, 0, 48
+    NEG  RAX
+    OR   RAX, TAG_INT
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE BitAnd()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    AND  RAX, RCX
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE BitOr()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    OR   RAX, RCX
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE BitShl()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SBFX RCX, RCX, 0, 48
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    SHL  RAX, RCX
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE BitShr()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SBFX RCX, RCX, 0, 48
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    SAR  RAX, RCX
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE BitXor()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    XOR  RAX, RCX
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE BitNot()
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    SBFX RAX, RAX, 0, 48
+    NOT  RAX
+    OR   RAX, TAG_INT
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE AddFloat()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    FMOV XMM0, RAX
+    FMOV XMM1, RCX
+    FADD XMM0, XMM1
+    FMOV RAX, XMM0
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE SubFloat()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    FMOV XMM0, RAX
+    FMOV XMM1, RCX
+    FSUB XMM0, XMM1
+    FMOV RAX, XMM0
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE MulFloat()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    FMOV XMM0, RAX
+    FMOV XMM1, RCX
+    FMUL XMM0, XMM1
+    FMOV RAX, XMM0
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE DivFloat()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    FMOV XMM0, RAX
+    FMOV XMM1, RCX
+    FDIV XMM0, XMM1
+    FMOV RAX, XMM0
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE NegFloat()
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    FMOV XMM0, RAX
+    FNEG XMM0, XMM0
+    FMOV RAX, XMM0
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE Less()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    SBFX RAX, RAX, 0, 48
+    SBFX RCX, RCX, 0, 48
+    CMP  RAX, RCX
+    CSET RAX, LT
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE LessEq()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    SBFX RAX, RAX, 0, 48
+    SBFX RCX, RCX, 0, 48
+    CMP  RAX, RCX
+    CSET RAX, LE
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE Greater()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    SBFX RAX, RAX, 0, 48
+    SBFX RCX, RCX, 0, 48
+    CMP  RAX, RCX
+    CSET RAX, GT
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE GreaterEq()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    SBFX RAX, RAX, 0, 48
+    SBFX RCX, RCX, 0, 48
+    CMP  RAX, RCX
+    CSET RAX, GE
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE Equal()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    CMP  RAX, RCX
+    CSET RAX, EQ
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE NotEqual()
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    CMP  RAX, RCX
+    CSET RAX, NE
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE BitShlUint(tag uint64)
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SBFX RCX, RCX, 0, 48
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    AND  RAX, 0x0000FFFFFFFFFFFF
+    SHL  RAX, RCX
+    AND  RAX, 0x0000FFFFFFFFFFFF
+    MOV  RCX, tag
+    OR   RAX, RCX
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE BitShrUint(tag uint64)
+    SUB  SP, 8
+    MOV  RCX, [SP]
+    SBFX RCX, RCX, 0, 48
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    AND  RAX, 0x0000FFFFFFFFFFFF
+    SHR  RAX, RCX
+    AND  RAX, 0x0000FFFFFFFFFFFF
+    MOV  RCX, tag
+    OR   RAX, RCX
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+
+# TEMPLATE IntToFloat()
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    SBFX RAX, RAX, 0, 48
+    SCVTF XMM0, RAX
+    FMOV RAX, XMM0
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE FloatToInt()
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    FMOV XMM0, RAX
+    FCVTZS RAX, XMM0
+    OR   RAX, TAG_INT
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE Dup()
+    MOV  RAX, [SP - 8]
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE Swap()
+    MOV  RAX, [SP - 8]
+    MOV  RCX, [SP - 16]
+    MOV  [SP - 8], RCX
+    MOV  [SP - 16], RAX
+
+# TEMPLATE LoadConst(idx uint16)
+    MOV  RAX, [CONST + idx*8]
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE LoadVal(val uint64)
+    MOV  RAX, val
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+
+# TEMPLATE Push(reg int)
+    MOV  [SP], reg
+    ADD  SP, 8
+
+# TEMPLATE Not(valTrue uint64, valFalse uint64)
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    MOV  RCX, valFalse
+    CMP  RAX, RCX
+    MOV  RDX, valTrue
+    CSEL RAX, RDX, RCX, EQ
+    MOV  [SP], RAX
+    ADD  SP, 8
+
+# TEMPLATE Pop()
+    SUB  SP, 8
+
+# TEMPLATE JumpIfFalse(valFalse uint64, valNil uint64) (jumpFalse int, jumpNil int)
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    MOV  RCX, valFalse
+    CMP  RAX, RCX
+    B.EQ 0 -> jumpFalse
+    MOV  RCX, valNil
+    CMP  RAX, RCX
+    B.EQ 0 -> jumpNil
+
+# TEMPLATE JumpIfTrue(valFalse uint64, valNil uint64, valInt0 uint64) (jumpFalse int, jumpNil int, jumpZero int)
+    SUB  SP, 8
+    MOV  RAX, [SP]
+    MOV  RCX, valFalse
+    CMP  RAX, RCX
+    B.EQ 0 -> jumpFalse
+    MOV  RCX, valNil
+    CMP  RAX, RCX
+    B.EQ 0 -> jumpNil
+    MOV  RCX, valInt0
+    CMP  RAX, RCX
+    B.EQ 0 -> jumpZero
+
+# TEMPLATE Jump() (jump int)
+    JMP  0 -> jump
+
+# TEMPLATE NativeCall(moduleID uint16, funcID uint16, argCount uint8)
+    SaveCallRegs
+    # System V ABI: RDI=ctx, RSI=moduleID, RDX=funcID, RCX=argCount
+    MOV  RDI, CTX
+    MOV  RSI, moduleID
+    MOV  RDX, funcID
+    MOV  RCX, argCount
+    # Load helper addr from context
+    MOV  RAX, [CTX + 104]
+    CALL RAX
+    RestoreCallRegs
+
+
+# TEMPLATE Halt()
+    RET

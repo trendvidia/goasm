@@ -1,0 +1,469 @@
+# ALIAS CTX = X19
+# ALIAS BP = X22
+# ALIAS SP = X21
+# ALIAS CONST = X23
+# ALIAS TAG_INT = X28
+
+# TEMPLATE AddLocalsInt(dst uint8, src1 uint8, src2 uint8)
+    MOVZ X24, src1
+    LDR  X24, [BP, X24, LSL #3]
+    MOVZ X25, src2
+    LDR  X25, [BP, X25, LSL #3]
+    ADD  X24, X24, X25
+    SUB  X24, X24, TAG_INT
+    MOVZ X26, dst
+    STR  X24, [BP, X26, LSL #3]
+
+# TEMPLATE IncrLocalInt(slot uint8, constIdx uint16)
+    MOVZ X24, slot
+    LDR  X24, [BP, X24, LSL #3]
+    MOVZ X25, constIdx
+    LDR  X25, [CONST, X25, LSL #3]
+    ADD  X24, X24, X25
+    SUB  X24, X24, TAG_INT
+    MOVZ X26, slot
+    STR  X24, [BP, X26, LSL #3]
+
+# TEMPLATE PushInt(reg int)
+    STR  reg, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE PopInt(reg int)
+    SUB  SP, SP, #8
+    LDR  reg, [SP, #0]
+
+# TEMPLATE LoadLocal(slot uint8)
+    MOVZ X26, slot
+    LDR  X24, [BP, X26, LSL #3]
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE StoreLocal(slot uint8)
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    MOVZ X26, slot
+    STR  X24, [BP, X26, LSL #3]
+
+# TEMPLATE AddInt()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    ADD  X24, X24, X25
+    SUB  X24, X24, TAG_INT
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE SubInt()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    SUB  X24, X24, X25
+    ADD  X24, X24, TAG_INT
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE MulInt()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    SBFX X24, X24, 0, 48
+    SBFX X25, X25, 0, 48
+    MUL  X24, X24, X25
+    ORR  X24, X24, TAG_INT
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE NegInt()
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    SBFX X24, X24, 0, 48
+    SUB  X24, XZR, X24
+    ORR  X24, X24, TAG_INT
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE BitAnd()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    AND  X24, X24, X25
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE BitOr()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    ORR  X24, X24, X25
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE BitShl()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SBFX X25, X25, 0, 48
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    LSLV X24, X24, X25
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE BitShr()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SBFX X25, X25, 0, 48
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    ASRV X24, X24, X25
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE BitXor()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    EOR  X24, X24, X25
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE BitNot()
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    SBFX X24, X24, 0, 48
+    MVN  X24, X24
+    ORR  X24, X24, TAG_INT
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE AddFloat()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    FMOV D0, X24
+    FMOV D1, X25
+    FADD D0, D0, D1
+    FMOV X24, D0
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE SubFloat()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    FMOV D0, X24
+    FMOV D1, X25
+    FSUB D0, D0, D1
+    FMOV X24, D0
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE MulFloat()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    FMOV D0, X24
+    FMOV D1, X25
+    FMUL D0, D0, D1
+    FMOV X24, D0
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE DivFloat()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    FMOV D0, X24
+    FMOV D1, X25
+    FDIV D0, D0, D1
+    FMOV X24, D0
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE NegFloat()
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    FMOV D0, X24
+    FNEG D0, D0
+    FMOV X24, D0
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE Less()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    SBFX X24, X24, 0, 48
+    SBFX X25, X25, 0, 48
+    CMP  X24, X25
+    CSET X24, LT
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE LessEq()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    SBFX X24, X24, 0, 48
+    SBFX X25, X25, 0, 48
+    CMP  X24, X25
+    CSET X24, LE
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE Greater()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    SBFX X24, X24, 0, 48
+    SBFX X25, X25, 0, 48
+    CMP  X24, X25
+    CSET X24, GT
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE GreaterEq()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    SBFX X24, X24, 0, 48
+    SBFX X25, X25, 0, 48
+    CMP  X24, X25
+    CSET X24, GE
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE LessUint()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    CMP  X24, X25
+    CSET X24, LO
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE LessEqUint()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    CMP  X24, X25
+    CSET X24, LS
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE GreaterUint()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    CMP  X24, X25
+    CSET X24, HI
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE GreaterEqUint()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    CMP  X24, X25
+    CSET X24, HS
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE Equal()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    CMP  X24, X25
+    CSET X24, EQ
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE NotEqual()
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    CMP  X24, X25
+    CSET X24, NE
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE BitShlUint(tag uint64)
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SBFX X25, X25, 0, 48
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    And48 X24, X24
+    LSLV X24, X24, X25
+    And48 X24, X24
+    MOVZ X26, tag, LSL #0
+    MOVK X26, tag, LSL #16
+    MOVK X26, tag, LSL #32
+    MOVK X26, tag, LSL #48
+    ORR  X24, X24, X26
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE BitShrUint(tag uint64)
+    SUB  SP, SP, #8
+    LDR  X25, [SP, #0]
+    SBFX X25, X25, 0, 48
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    And48 X24, X24
+    LSRV X24, X24, X25
+    And48 X24, X24
+    MOVZ X26, tag, LSL #0
+    MOVK X26, tag, LSL #16
+    MOVK X26, tag, LSL #32
+    MOVK X26, tag, LSL #48
+    ORR  X24, X24, X26
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE IntToFloat()
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    SBFX X24, X24, 0, 48
+    SCVTF D0, X24
+    FMOV X24, D0
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE FloatToInt()
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    FMOV D0, X24
+    FCVTZS X24, D0
+    ORR  X24, X24, TAG_INT
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE Dup()
+    SUB  X26, SP, #8
+    LDR  X24, [X26, #0]
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE Swap()
+    SUB  X26, SP, #8
+    SUB  X27, SP, #16
+    LDR  X24, [X26, #0]
+    LDR  X25, [X27, #0]
+    STR  X25, [X26, #0]
+    STR  X24, [X27, #0]
+
+# TEMPLATE LoadConst(idx uint16)
+    MOVZ X25, idx
+    LDR  X24, [CONST, X25, LSL #3]
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE LoadVal(val uint64)
+    MOVZ X24, val, LSL #0
+    MOVK X24, val, LSL #16
+    MOVK X24, val, LSL #32
+    MOVK X24, val, LSL #48
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE Push(reg int)
+    STR  reg, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE Not(valTrue uint64, valFalse uint64)
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    MOVZ X25, valFalse, LSL #0
+    MOVK X25, valFalse, LSL #16
+    MOVK X25, valFalse, LSL #32
+    MOVK X25, valFalse, LSL #48
+    CMP  X24, X25
+    MOVZ X26, valTrue, LSL #0
+    MOVK X26, valTrue, LSL #16
+    MOVK X26, valTrue, LSL #32
+    MOVK X26, valTrue, LSL #48
+    CSEL X24, X26, X25, CondEQ
+    STR  X24, [SP, #0]
+    ADD  SP, SP, #8
+
+# TEMPLATE Pop()
+    SUB  SP, SP, #8
+
+# TEMPLATE JumpIfFalse(valFalse uint64, valNil uint64) (jumpFalse int, jumpNil int)
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    MOVZ X25, valFalse, LSL #0
+    MOVK X25, valFalse, LSL #16
+    MOVK X25, valFalse, LSL #32
+    MOVK X25, valFalse, LSL #48
+    CMP  X24, X25
+    B.EQ 0 -> jumpFalse
+    MOVZ X25, valNil, LSL #0
+    MOVK X25, valNil, LSL #16
+    MOVK X25, valNil, LSL #32
+    MOVK X25, valNil, LSL #48
+    CMP  X24, X25
+    B.EQ 0 -> jumpNil
+
+# TEMPLATE JumpIfTrue(valFalse uint64, valNil uint64, valInt0 uint64) (jumpFalse int, jumpNil int, jumpZero int)
+    SUB  SP, SP, #8
+    LDR  X24, [SP, #0]
+    MOVZ X25, valFalse, LSL #0
+    MOVK X25, valFalse, LSL #16
+    MOVK X25, valFalse, LSL #32
+    MOVK X25, valFalse, LSL #48
+    CMP  X24, X25
+    B.EQ 0 -> jumpFalse
+    MOVZ X25, valNil, LSL #0
+    MOVK X25, valNil, LSL #16
+    MOVK X25, valNil, LSL #32
+    MOVK X25, valNil, LSL #48
+    CMP  X24, X25
+    B.EQ 0 -> jumpNil
+    MOVZ X25, valInt0, LSL #0
+    MOVK X25, valInt0, LSL #16
+    MOVK X25, valInt0, LSL #32
+    MOVK X25, valInt0, LSL #48
+    CMP  X24, X25
+    B.EQ 0 -> jumpZero
+
+# TEMPLATE Jump() (jump int)
+    B    0 -> jump
+
+
+# TEMPLATE NativeCall(moduleID uint16, funcID uint16, argCount uint8)
+    SaveCallRegs
+    # X0 = JITContext (already in X19)
+    # X1 = moduleID, X2 = funcID, X3 = argCount
+    ORR  X0, XZR, CTX
+    MOVZ X1, moduleID
+    MOVZ X2, funcID
+    MOVZ X3, argCount
+    # Load helper addr from context
+    LDR  X24, [CTX, #13]
+    BLR  X24
+    RestoreCallRegs
+
+
+# TEMPLATE Halt()
+    RET
