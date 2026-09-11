@@ -31,14 +31,18 @@ jobs:
             exit 1
           fi
 
+      # The library and the command are what this repository owns. jit/ is
+      # a sample of generated output whose Emitter is arm64-only (#1, step
+      # 3: reference or fixture is still to be decided), so it is checked
+      # by gen's golden test as bytes, not compiled here.
       - name: go vet
-        run: go vet ./...
+        run: go vet ./template/... ./gen/... ./cmd/...
 
       - name: build
-        run: go build ./...
+        run: go build ./template/... ./gen/... ./cmd/...
 
       - name: test (includes the golden check over jit/)
-        run: go test -race ./...
+        run: go test -race ./template/... ./gen/... ./cmd/...
 
       - name: regeneration leaves the tree unchanged
         run: |
