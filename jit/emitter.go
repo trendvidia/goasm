@@ -56,37 +56,62 @@ const (
 
 func condToCode(cond string) uint32 {
 	switch cond {
-	case "EQ": return 0
-	case "NE": return 1
-	case "HS", "CS": return 2
-	case "LO", "CC": return 3
-	case "MI": return 4
-	case "PL": return 5
-	case "VS": return 6
-	case "VC": return 7
-	case "HI": return 8
-	case "LS": return 9
-	case "GE": return 10
-	case "LT": return 11
-	case "GT": return 12
-	case "LE": return 13
-	case "AL": return 14
+	case "EQ":
+		return 0
+	case "NE":
+		return 1
+	case "HS", "CS":
+		return 2
+	case "LO", "CC":
+		return 3
+	case "MI":
+		return 4
+	case "PL":
+		return 5
+	case "VS":
+		return 6
+	case "VC":
+		return 7
+	case "HI":
+		return 8
+	case "LS":
+		return 9
+	case "GE":
+		return 10
+	case "LT":
+		return 11
+	case "GT":
+		return 12
+	case "LE":
+		return 13
+	case "AL":
+		return 14
 	}
 	return 0
 }
 
 func (e *Emitter) invertCond(cond uint32) uint32 {
 	switch cond {
-	case uint32(CondLT): return uint32(CondGE)
-	case uint32(CondLE): return uint32(CondGT)
-	case uint32(CondGT): return uint32(CondLE)
-	case uint32(CondGE): return uint32(CondLT)
-	case uint32(CondEQ): return uint32(CondNE)
-	case uint32(CondNE): return uint32(CondEQ)
-	case uint32(CondLO): return uint32(CondHS)
-	case uint32(CondLS): return uint32(CondHI)
-	case uint32(CondHI): return uint32(CondLS)
-	case uint32(CondHS): return uint32(CondLO)
+	case uint32(CondLT):
+		return uint32(CondGE)
+	case uint32(CondLE):
+		return uint32(CondGT)
+	case uint32(CondGT):
+		return uint32(CondLE)
+	case uint32(CondGE):
+		return uint32(CondLT)
+	case uint32(CondEQ):
+		return uint32(CondNE)
+	case uint32(CondNE):
+		return uint32(CondEQ)
+	case uint32(CondLO):
+		return uint32(CondHS)
+	case uint32(CondLS):
+		return uint32(CondHI)
+	case uint32(CondHI):
+		return uint32(CondLS)
+	case uint32(CondHS):
+		return uint32(CondLO)
 	}
 	return cond ^ 1
 }
@@ -186,9 +211,15 @@ func (e *Emitter) MvnReg(rd, rn int) {
 }
 func (e *Emitter) MovImm64(rd int, val uint64) {
 	e.emit32(0xD2800000 | uint32(uint16(val))<<5 | uint32(rd))
-	if v := uint16(val >> 16); v != 0 { e.emit32(0xF2800000 | 1<<21 | uint32(v)<<5 | uint32(rd)) }
-	if v := uint16(val >> 32); v != 0 { e.emit32(0xF2800000 | 2<<21 | uint32(v)<<5 | uint32(rd)) }
-	if v := uint16(val >> 48); v != 0 { e.emit32(0xF2800000 | 3<<21 | uint32(v)<<5 | uint32(rd)) }
+	if v := uint16(val >> 16); v != 0 {
+		e.emit32(0xF2800000 | 1<<21 | uint32(v)<<5 | uint32(rd))
+	}
+	if v := uint16(val >> 32); v != 0 {
+		e.emit32(0xF2800000 | 2<<21 | uint32(v)<<5 | uint32(rd))
+	}
+	if v := uint16(val >> 48); v != 0 {
+		e.emit32(0xF2800000 | 3<<21 | uint32(v)<<5 | uint32(rd))
+	}
 }
 func (e *Emitter) MovImm16(rd int, val uint32, shift int) {
 	e.emit32(0xD2800000 | uint32(shift/16)<<21 | uint32(val&0xFFFF)<<5 | uint32(rd))
@@ -221,9 +252,9 @@ func (e *Emitter) Cset(rd int, cond int) {
 func (e *Emitter) Csel(rd, rn, rm, cond int) {
 	e.emit32(0x9A800000 | uint32(rm)<<16 | uint32(cond)<<12 | uint32(rn)<<5 | uint32(rd))
 }
-func (e *Emitter) Ret() { e.emit32(0xD65F03C0) }
-func (e *Emitter) Br(rn int) { e.emit32(0xD61F0000 | uint32(rn)<<5) }
-func (e *Emitter) Blr(rn int) { e.emit32(0xD63F0000 | uint32(rn)<<5) }
+func (e *Emitter) Ret()          { e.emit32(0xD65F03C0) }
+func (e *Emitter) Br(rn int)     { e.emit32(0xD61F0000 | uint32(rn)<<5) }
+func (e *Emitter) Blr(rn int)    { e.emit32(0xD63F0000 | uint32(rn)<<5) }
 func (e *Emitter) Bl(offset int) { e.emit32(0x94000000 | (uint32(offset) & 0x03FFFFFF)) }
 
 func (e *Emitter) BPlaceholder() int {
@@ -256,23 +287,31 @@ func (e *Emitter) ExtractUnsigned(rd, rn, width int) {
 func (e *Emitter) And48(rd, rn int) {
 	e.emit32(0x92000000 | 1<<22 | 16<<16 | 47<<10 | uint32(rn)<<5 | uint32(rd))
 }
-func (e *Emitter) FaddD(fd, fn, fm int) { e.emit32(0x1E602800 | uint32(fm)<<16 | uint32(fn)<<5 | uint32(fd)) }
-func (e *Emitter) FsubD(fd, fn, fm int) { e.emit32(0x1E603800 | uint32(fm)<<16 | uint32(fn)<<5 | uint32(fd)) }
-func (e *Emitter) FmulD(fd, fn, fm int) { e.emit32(0x1E600800 | uint32(fm)<<16 | uint32(fn)<<5 | uint32(fd)) }
-func (e *Emitter) FdivD(fd, fn, fm int) { e.emit32(0x1E601800 | uint32(fm)<<16 | uint32(fn)<<5 | uint32(fd)) }
-func (e *Emitter) FnegD(fd, fn int)     { e.emit32(0x1E614000 | uint32(fn)<<5 | uint32(fd)) }
-func (e *Emitter) FcmpD(fn, fm int)     { e.emit32(0x1E602000 | uint32(fm)<<16 | uint32(fn)<<5) }
-func (e *Emitter) FmovToFP(fd, rn int)  { e.emit32(0x9E670000 | uint32(rn)<<5 | uint32(fd)) }
-func (e *Emitter) FmovToGP(rd, fn int)  { e.emit32(0x9E660000 | uint32(fn)<<5 | uint32(rd)) }
+func (e *Emitter) FaddD(fd, fn, fm int) {
+	e.emit32(0x1E602800 | uint32(fm)<<16 | uint32(fn)<<5 | uint32(fd))
+}
+func (e *Emitter) FsubD(fd, fn, fm int) {
+	e.emit32(0x1E603800 | uint32(fm)<<16 | uint32(fn)<<5 | uint32(fd))
+}
+func (e *Emitter) FmulD(fd, fn, fm int) {
+	e.emit32(0x1E600800 | uint32(fm)<<16 | uint32(fn)<<5 | uint32(fd))
+}
+func (e *Emitter) FdivD(fd, fn, fm int) {
+	e.emit32(0x1E601800 | uint32(fm)<<16 | uint32(fn)<<5 | uint32(fd))
+}
+func (e *Emitter) FnegD(fd, fn int)       { e.emit32(0x1E614000 | uint32(fn)<<5 | uint32(fd)) }
+func (e *Emitter) FcmpD(fn, fm int)       { e.emit32(0x1E602000 | uint32(fm)<<16 | uint32(fn)<<5) }
+func (e *Emitter) FmovToFP(fd, rn int)    { e.emit32(0x9E670000 | uint32(rn)<<5 | uint32(fd)) }
+func (e *Emitter) FmovToGP(rd, fn int)    { e.emit32(0x9E660000 | uint32(fn)<<5 | uint32(rd)) }
 func (e *Emitter) IntToDouble(fd, rn int) { e.emit32(0x9E620000 | uint32(rn)<<5 | uint32(fd)) }
 func (e *Emitter) DoubleToInt(rd, fn int) { e.emit32(0x9E780000 | uint32(fn)<<5 | uint32(rd)) }
 
-func (e *Emitter) SaveCallRegs() {}
+func (e *Emitter) SaveCallRegs()    {}
 func (e *Emitter) RestoreCallRegs() {}
 func (e *Emitter) Cbnz(rn int, offset int) {
 	e.emit32(0xB5000000 | (uint32(offset)&0x7FFFF)<<5 | uint32(rn))
 }
-func (e *Emitter) StrPre(rt int) { e.emit32(0xF81F0FE0 | uint32(rt)) }
+func (e *Emitter) StrPre(rt int)  { e.emit32(0xF81F0FE0 | uint32(rt)) }
 func (e *Emitter) LdrPost(rt int) { e.emit32(0xF84107E0 | uint32(rt)) }
-func (e *Emitter) SaveLR() {}
-func (e *Emitter) RestoreLR() {}
+func (e *Emitter) SaveLR()        {}
+func (e *Emitter) RestoreLR()     {}
