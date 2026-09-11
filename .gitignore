@@ -1,0 +1,2 @@
+# The built command; consumers run it with go run, pinned to a tag.
+/goasm

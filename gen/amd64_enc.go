@@ -1,7 +1,8 @@
-package main
+package gen
 
 import (
 	"fmt"
+	"github.com/trendvidia/goasm/template"
 	"strconv"
 	"strings"
 )
@@ -15,7 +16,7 @@ func NewAMD64Encoder(aliases map[string]string) *AMD64Encoder {
 	return &AMD64Encoder{aliases: aliases}
 }
 
-func (e *AMD64Encoder) Encode(instr Instruction, params []Parameter) (string, error) {
+func (e *AMD64Encoder) Encode(instr template.Instruction, params []template.Parameter) (string, error) {
 	mnemonic := instr.Mnemonic
 	ops := instr.Operands
 
@@ -132,11 +133,16 @@ func (e *AMD64Encoder) Encode(instr Instruction, params []Parameter) (string, er
 			return "", fmt.Errorf("invalid operands for UBFX: %v", ops)
 		}
 		return fmt.Sprintf("e.ExtractUnsigned(%s, %s, %s)", e.regOrParam(ops[0], params), e.regOrParam(ops[1], params), ops[3]), nil
-	case "FADD": return e.encodeFloat("FaddD", ops, params)
-	case "FSUB": return e.encodeFloat("FsubD", ops, params)
-	case "FMUL": return e.encodeFloat("FmulD", ops, params)
-	case "FDIV": return e.encodeFloat("FdivD", ops, params)
-	case "FNEG": return e.encodeFloat("FnegD", ops, params)
+	case "FADD":
+		return e.encodeFloat("FaddD", ops, params)
+	case "FSUB":
+		return e.encodeFloat("FsubD", ops, params)
+	case "FMUL":
+		return e.encodeFloat("FmulD", ops, params)
+	case "FDIV":
+		return e.encodeFloat("FdivD", ops, params)
+	case "FNEG":
+		return e.encodeFloat("FnegD", ops, params)
 	case "FCMP":
 		if len(ops) != 2 {
 			return "", fmt.Errorf("invalid operands for FCMP: %v", ops)
@@ -180,12 +186,12 @@ func (e *AMD64Encoder) resolveAlias(op string) string {
 	return op
 }
 
-func (e *AMD64Encoder) encodeMov(ops []string, params []Parameter) (string, error) {
+func (e *AMD64Encoder) encodeMov(ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 2 {
 		return "", fmt.Errorf("invalid operands for MOV: %v", ops)
 	}
 	dst, src := ops[0], ops[1]
-	
+
 	if strings.HasPrefix(dst, "[") {
 		mem := dst[1 : len(dst)-1]
 		base, idx, scale, disp, err := e.parseMem(mem, params)
@@ -209,7 +215,7 @@ func (e *AMD64Encoder) encodeMov(ops []string, params []Parameter) (string, erro
 		}
 		return fmt.Sprintf("e.LdrReg(%s, %s, %s)", e.regOrParam(dst, params), base, idx), nil
 	}
-	
+
 	if strings.HasPrefix(src, "#") || isParam(src, params) {
 		val := strings.TrimPrefix(src, "#")
 		return fmt.Sprintf("e.MovImm64(%s, uint64(%s))", e.regOrParam(dst, params), val), nil
@@ -218,7 +224,7 @@ func (e *AMD64Encoder) encodeMov(ops []string, params []Parameter) (string, erro
 	return fmt.Sprintf("e.MovReg(%s, %s)", e.regOrParam(dst, params), e.regOrParam(src, params)), nil
 }
 
-func (e *AMD64Encoder) encodeArithmetic(method string, ops []string, params []Parameter) (string, error) {
+func (e *AMD64Encoder) encodeArithmetic(method string, ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 2 {
 		return "", fmt.Errorf("invalid operands for %s: %v", method, ops)
 	}
@@ -231,7 +237,9 @@ func (e *AMD64Encoder) encodeArithmetic(method string, ops []string, params []Pa
 	if strings.HasPrefix(src, "[") {
 		mem := src[1 : len(src)-1]
 		base, idx, scale, disp, err := e.parseMem(mem, params)
-		if err != nil { return "", err }
+		if err != nil {
+			return "", err
+		}
 		// Temporary: load to scratch, then operate
 		load := ""
 		if idx == "" {
@@ -245,7 +253,7 @@ func (e *AMD64Encoder) encodeArithmetic(method string, ops []string, params []Pa
 	return fmt.Sprintf("e.%sReg(%s, %s, %s)", method, e.regOrParam(dst, params), e.regOrParam(dst, params), e.regOrParam(src, params)), nil
 }
 
-func (e *AMD64Encoder) encodeShift(method string, ops []string, params []Parameter) (string, error) {
+func (e *AMD64Encoder) encodeShift(method string, ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 2 {
 		return "", fmt.Errorf("invalid operands for shift: %v", ops)
 	}
@@ -258,10 +266,11 @@ func (e *AMD64Encoder) encodeShift(method string, ops []string, params []Paramet
 	return fmt.Sprintf("e.%sReg(%s, %s, %s)", method, e.regOrParam(dst, params), e.regOrParam(dst, params), e.regOrParam(src, params)), nil
 }
 
-
-func (e *AMD64Encoder) encodeFloat(method string, ops []string, params []Parameter) (string, error) {
+func (e *AMD64Encoder) encodeFloat(method string, ops []string, params []template.Parameter) (string, error) {
 	if method == "FnegD" {
-		if len(ops) != 2 { return "", fmt.Errorf("FnegD requires 2 operands") }
+		if len(ops) != 2 {
+			return "", fmt.Errorf("FnegD requires 2 operands")
+		}
 		return fmt.Sprintf("e.FnegD(%s, %s)", e.regOrParam(ops[0], params), e.regOrParam(ops[1], params)), nil
 	}
 	if len(ops) == 2 {
@@ -273,9 +282,7 @@ func (e *AMD64Encoder) encodeFloat(method string, ops []string, params []Paramet
 	return "", fmt.Errorf("invalid operands for float %s: %v", method, ops)
 }
 
-
-
-func (e *AMD64Encoder) encodeBranch(ops []string, params []Parameter) (string, error) {
+func (e *AMD64Encoder) encodeBranch(ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 1 {
 		return "", fmt.Errorf("invalid operands for branch: %v", ops)
 	}
@@ -291,7 +298,7 @@ func (e *AMD64Encoder) encodeBranch(ops []string, params []Parameter) (string, e
 	return fmt.Sprintf("// TODO: Branch to %s", target), nil
 }
 
-func (e *AMD64Encoder) regOrParam(op string, params []Parameter) string {
+func (e *AMD64Encoder) regOrParam(op string, params []template.Parameter) string {
 	if isParam(op, params) {
 		pType := ""
 		for _, p := range params {
@@ -308,7 +315,6 @@ func (e *AMD64Encoder) regOrParam(op string, params []Parameter) string {
 	return regToNumAMD64(op)
 }
 
-
 func regToNumAMD64(reg string) string {
 	regs := map[string]string{
 		"RAX": "0", "RCX": "1", "RDX": "2", "RBX": "3", "RSP": "4", "RBP": "5", "RSI": "6", "RDI": "7",
@@ -321,7 +327,7 @@ func regToNumAMD64(reg string) string {
 	return reg
 }
 
-func (e *AMD64Encoder) condToCode(cond string, params []Parameter) string {
+func (e *AMD64Encoder) condToCode(cond string, params []template.Parameter) string {
 	if isParam(cond, params) {
 		return cond
 	}
@@ -336,7 +342,7 @@ func (e *AMD64Encoder) condToCode(cond string, params []Parameter) string {
 	return cond
 }
 
-func (e *AMD64Encoder) parseMem(mem string, params []Parameter) (base string, idx string, scale int, disp int, err error) {
+func (e *AMD64Encoder) parseMem(mem string, params []template.Parameter) (base string, idx string, scale int, disp int, err error) {
 	parts := strings.Split(mem, "+")
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
