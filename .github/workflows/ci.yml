@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: vet + build + test + regenerate
+    runs-on: [self-hosted, macOS, ARM64]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: go version
+        run: go version
+
+      - name: gofmt
+        run: |
+          out=$(gofmt -l . 2>/dev/null || true)
+          if [ -n "$out" ]; then
+            echo "::error::gofmt found unformatted files:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: build
+        run: go build ./...
+
+      - name: test (includes the golden check over jit/)
+        run: go test -race ./...
+
+      - name: regeneration leaves the tree unchanged
+        run: |
+          go generate ./...
+          if ! git diff --exit-code --stat; then
+            echo "::error::go generate ./... changed committed files; regenerate and commit jit/"
+            exit 1
+          fi
