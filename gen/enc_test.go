@@ -48,8 +48,11 @@ func TestAMD64Encoder(t *testing.T) {
 		expected string
 	}{
 		{
+			// The emitter API since 6e4a188: a scaled load is one LdrReg
+			// call, not raw REX bytes. The golden test over
+			// templates/amd64.goasm holds the full output.
 			template.Instruction{Mnemonic: "MOV", Operands: []string{"RAX", "[BP + slot*8]"}},
-			"e.emitREX(1, 0, 0, 0)",
+			"e.LdrReg(0, 14, int(slot))",
 		},
 	}
 
