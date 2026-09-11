@@ -9,9 +9,15 @@ on:
 jobs:
   test:
     name: vet + build + test + regenerate
-    runs-on: [self-hosted, macOS, ARM64]
+    # GitHub-hosted: goasm has no private dependencies and needs no fork
+    # toolchain, and this repository has no self-hosted runner registered.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
 
       - name: go version
         run: go version
