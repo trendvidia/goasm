@@ -1,7 +1,8 @@
-package main
+package gen
 
 import (
 	"fmt"
+	"github.com/trendvidia/goasm/template"
 	"strconv"
 	"strings"
 )
@@ -15,7 +16,7 @@ func NewARM64Encoder(aliases map[string]string) *ARM64Encoder {
 	return &ARM64Encoder{aliases: aliases}
 }
 
-func (e *ARM64Encoder) Encode(instr Instruction, params []Parameter) (string, error) {
+func (e *ARM64Encoder) Encode(instr template.Instruction, params []template.Parameter) (string, error) {
 	mnemonic := instr.Mnemonic
 	ops := instr.Operands
 
@@ -102,38 +103,42 @@ func (e *ARM64Encoder) Encode(instr Instruction, params []Parameter) (string, er
 	}
 }
 
-func (e *ARM64Encoder) encodeBitfield(mnemonic string, ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeBitfield(mnemonic string, ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 4 {
 		return "", fmt.Errorf("invalid operands for %s: %v", mnemonic, ops)
 	}
 	rd, rn, lsb, width := ops[0], ops[1], ops[2], ops[3]
 	if mnemonic == "SBFX" {
-		return fmt.Sprintf("e.Sbfx(%s, %s, %s, %s)", 
+		return fmt.Sprintf("e.Sbfx(%s, %s, %s, %s)",
 			e.regOrParam(rd, params, 0), e.regOrParam(rn, params, 0), lsb, width), nil
 	}
 	if lsb == "0" {
-		return fmt.Sprintf("e.ExtractUnsigned(%s, %s, %s)", 
+		return fmt.Sprintf("e.ExtractUnsigned(%s, %s, %s)",
 			e.regOrParam(rd, params, 0), e.regOrParam(rn, params, 0), width), nil
 	}
 	return "", fmt.Errorf("unsupported bitfield: %s %v", mnemonic, ops)
 }
 
-func (e *ARM64Encoder) encodeFloatArithmetic(mnemonic string, ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeFloatArithmetic(mnemonic string, ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 3 {
 		return "", fmt.Errorf("invalid operands for %s: %v", mnemonic, ops)
 	}
 	fd, fn, fm := ops[0], ops[1], ops[2]
 	method := ""
 	switch mnemonic {
-	case "FADD": method = "FaddD"
-	case "FSUB": method = "FsubD"
-	case "FMUL": method = "FmulD"
-	case "FDIV": method = "FdivD"
+	case "FADD":
+		method = "FaddD"
+	case "FSUB":
+		method = "FsubD"
+	case "FMUL":
+		method = "FmulD"
+	case "FDIV":
+		method = "FdivD"
 	}
 	return fmt.Sprintf("e.%s(%s, %s, %s)", method, e.regOrParam(fd, params, 0), e.regOrParam(fn, params, 0), e.regOrParam(fm, params, 0)), nil
 }
 
-func (e *ARM64Encoder) encodeFloatUnary(mnemonic string, ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeFloatUnary(mnemonic string, ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 2 {
 		return "", fmt.Errorf("invalid operands for %s: %v", mnemonic, ops)
 	}
@@ -141,7 +146,7 @@ func (e *ARM64Encoder) encodeFloatUnary(mnemonic string, ops []string, params []
 	return fmt.Sprintf("e.FnegD(%s, %s)", e.regOrParam(fd, params, 0), e.regOrParam(fn, params, 0)), nil
 }
 
-func (e *ARM64Encoder) encodeFloatCompare(ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeFloatCompare(ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 2 {
 		return "", fmt.Errorf("invalid operands for FCMP: %v", ops)
 	}
@@ -149,7 +154,7 @@ func (e *ARM64Encoder) encodeFloatCompare(ops []string, params []Parameter) (str
 	return fmt.Sprintf("e.FcmpD(%s, %s)", e.regOrParam(fn, params, 0), e.regOrParam(fm, params, 0)), nil
 }
 
-func (e *ARM64Encoder) encodeFloatMove(ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeFloatMove(ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 2 {
 		return "", fmt.Errorf("invalid operands for FMOV: %v", ops)
 	}
@@ -162,7 +167,7 @@ func (e *ARM64Encoder) encodeFloatMove(ops []string, params []Parameter) (string
 	return "", fmt.Errorf("unsupported FMOV form: %s, %s", dst, src)
 }
 
-func (e *ARM64Encoder) encodeFloatConvert(mnemonic string, ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeFloatConvert(mnemonic string, ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 2 {
 		return "", fmt.Errorf("invalid operands for %s: %v", mnemonic, ops)
 	}
@@ -192,7 +197,7 @@ func (e *ARM64Encoder) resolveAlias(op string) string {
 	return op
 }
 
-func (e *ARM64Encoder) regOrParam(op string, params []Parameter, shift int) string {
+func (e *ARM64Encoder) regOrParam(op string, params []template.Parameter, shift int) string {
 	if isParam(op, params) {
 		pType := ""
 		for _, p := range params {
@@ -222,8 +227,7 @@ func (e *ARM64Encoder) regOrParam(op string, params []Parameter, shift int) stri
 	return fmt.Sprintf("int(%s)<<%d", num, shift)
 }
 
-
-func (e *ARM64Encoder) encodeLoadStore(mnemonic string, ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeLoadStore(mnemonic string, ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 2 {
 		return "", fmt.Errorf("invalid operands for %s: %v", mnemonic, ops)
 	}
@@ -238,9 +242,8 @@ func (e *ARM64Encoder) encodeLoadStore(mnemonic string, ops []string, params []P
 		parts[i] = strings.TrimSpace(parts[i])
 	}
 
-
 	rn := parts[0]
-	
+
 	if len(parts) > 1 {
 		// Check for register offset: [Rn, Rm, LSL #shift] or [Rn, Rm]
 		// Actually, let's look for LSL or if the second part is a register/param.
@@ -265,28 +268,34 @@ func (e *ARM64Encoder) encodeLoadStore(mnemonic string, ops []string, params []P
 		if isRegOffset || (!strings.HasPrefix(parts[1], "#") && !isParam(parts[1], params) && regToNum(parts[1]) != parts[1]) {
 			// Actually simpler: if it's not starting with # and it's not just a numeric param, it's likely a reg offset
 			// But for now, specifically handle the common forms.
-			if rm == "" { rm = parts[1] }
+			if rm == "" {
+				rm = parts[1]
+			}
 			rm = strings.TrimPrefix(rm, "#")
 
 			method := "LdrReg"
-			if mnemonic == "STR" { method = "StrReg" }
+			if mnemonic == "STR" {
+				method = "StrReg"
+			}
 			return fmt.Sprintf("e.%s(%s, %s, %s)", method, e.regOrParam(rt, params, 0), e.regOrParam(rn, params, 0), e.regOrParam(rm, params, 0)), nil
 		} else {
 			imm := strings.TrimPrefix(parts[1], "#")
 			method := "LdrImm"
-			if mnemonic == "STR" { method = "StrImm" }
+			if mnemonic == "STR" {
+				method = "StrImm"
+			}
 			return fmt.Sprintf("e.%s(%s, %s, uint32(%s))", method, e.regOrParam(rt, params, 0), e.regOrParam(rn, params, 0), e.regOrParam(imm, params, 0)), nil
 		}
 	}
 
-
 	method := "LdrImm"
-	if mnemonic == "STR" { method = "StrImm" }
+	if mnemonic == "STR" {
+		method = "StrImm"
+	}
 	return fmt.Sprintf("e.%s(%s, %s, 0)", method, e.regOrParam(rt, params, 0), e.regOrParam(rn, params, 0)), nil
 }
 
-
-func (e *ARM64Encoder) encodeMovz(ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeMovz(ops []string, params []template.Parameter) (string, error) {
 	if len(ops) < 2 {
 		return "", fmt.Errorf("invalid operands for MOVZ: %v", ops)
 	}
@@ -299,7 +308,7 @@ func (e *ARM64Encoder) encodeMovz(ops []string, params []Parameter) (string, err
 	return fmt.Sprintf("e.Movz(%s, uint16(%s), %d)", e.regOrParam(rd, params, 0), strings.TrimPrefix(imm, "#"), shift), nil
 }
 
-func (e *ARM64Encoder) encodeMovk(ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeMovk(ops []string, params []template.Parameter) (string, error) {
 	if len(ops) < 2 {
 		return "", fmt.Errorf("invalid operands for MOVK: %v", ops)
 	}
@@ -312,7 +321,7 @@ func (e *ARM64Encoder) encodeMovk(ops []string, params []Parameter) (string, err
 	return fmt.Sprintf("e.Movk(%s, uint16(%s), %d)", e.regOrParam(rd, params, 0), strings.TrimPrefix(imm, "#"), shift), nil
 }
 
-func (e *ARM64Encoder) encodeLogicalImm(mnemonic string, ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeLogicalImm(mnemonic string, ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 3 {
 		return "", fmt.Errorf("invalid operands for %s immediate: %v", mnemonic, ops)
 	}
@@ -322,11 +331,10 @@ func (e *ARM64Encoder) encodeLogicalImm(mnemonic string, ops []string, params []
 		return fmt.Sprintf("e.And48(%s, %s)", e.regOrParam(rd, params, 0), e.regOrParam(rn, params, 0)), nil
 	}
 
-
 	return "", fmt.Errorf("unsupported logical immediate: %s", imm)
 }
 
-func (e *ARM64Encoder) encodeArithmetic(mnemonic string, ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeArithmetic(mnemonic string, ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 3 {
 		return "", fmt.Errorf("invalid operands for %s: %v", mnemonic, ops)
 	}
@@ -335,12 +343,18 @@ func (e *ARM64Encoder) encodeArithmetic(mnemonic string, ops []string, params []
 	immVal := strings.TrimPrefix(rm, "#")
 	method := ""
 	switch mnemonic {
-	case "ADD": method = "Add"
-	case "SUB": method = "Sub"
-	case "AND": method = "And"
-	case "ORR": method = "Orr"
-	case "EOR": method = "Eor"
-	case "ORN": method = "Orn"
+	case "ADD":
+		method = "Add"
+	case "SUB":
+		method = "Sub"
+	case "AND":
+		method = "And"
+	case "ORR":
+		method = "Orr"
+	case "EOR":
+		method = "Eor"
+	case "ORN":
+		method = "Orn"
 	}
 	if isImm {
 		return fmt.Sprintf("e.%sImm(%s, %s, uint64(%s))", method, e.regOrParam(rd, params, 0), e.regOrParam(rn, params, 0), e.regOrParam(immVal, params, 0)), nil
@@ -348,8 +362,7 @@ func (e *ARM64Encoder) encodeArithmetic(mnemonic string, ops []string, params []
 	return fmt.Sprintf("e.%sReg(%s, %s, %s)", method, e.regOrParam(rd, params, 0), e.regOrParam(rn, params, 0), e.regOrParam(rm, params, 0)), nil
 }
 
-
-func (e *ARM64Encoder) encodeMultiply(ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeMultiply(ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 3 {
 		return "", fmt.Errorf("invalid operands for MUL: %v", ops)
 	}
@@ -357,7 +370,7 @@ func (e *ARM64Encoder) encodeMultiply(ops []string, params []Parameter) (string,
 	return fmt.Sprintf("e.MulReg(%s, %s, %s)", e.regOrParam(rd, params, 0), e.regOrParam(rn, params, 0), e.regOrParam(rm, params, 0)), nil
 }
 
-func (e *ARM64Encoder) encodeMvn(ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeMvn(ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 2 {
 		return "", fmt.Errorf("invalid operands for MVN: %v", ops)
 	}
@@ -365,21 +378,24 @@ func (e *ARM64Encoder) encodeMvn(ops []string, params []Parameter) (string, erro
 	return fmt.Sprintf("e.MvnReg(%s, %s)", e.regOrParam(rd, params, 0), e.regOrParam(rn, params, 0)), nil
 }
 
-func (e *ARM64Encoder) encodeShiftVar(mnemonic string, ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeShiftVar(mnemonic string, ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 3 {
 		return "", fmt.Errorf("invalid operands for %s: %v", mnemonic, ops)
 	}
 	rd, rn, rm := ops[0], ops[1], ops[2]
 	method := ""
 	switch mnemonic {
-	case "LSLV": method = "LslvReg"
-	case "LSRV": method = "LsrvReg"
-	case "ASRV": method = "AsrvReg"
+	case "LSLV":
+		method = "LslvReg"
+	case "LSRV":
+		method = "LsrvReg"
+	case "ASRV":
+		method = "AsrvReg"
 	}
 	return fmt.Sprintf("e.%s(%s, %s, %s)", method, e.regOrParam(rd, params, 0), e.regOrParam(rn, params, 0), e.regOrParam(rm, params, 0)), nil
 }
 
-func (e *ARM64Encoder) encodeCompare(ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeCompare(ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 2 {
 		return "", fmt.Errorf("invalid operands for CMP: %v", ops)
 	}
@@ -387,7 +403,7 @@ func (e *ARM64Encoder) encodeCompare(ops []string, params []Parameter) (string, 
 	return fmt.Sprintf("e.CmpReg(%s, %s)", e.regOrParam(rn, params, 0), e.regOrParam(rm, params, 0)), nil
 }
 
-func (e *ARM64Encoder) encodeCset(ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeCset(ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 2 {
 		return "", fmt.Errorf("invalid operands for CSET: %v", ops)
 	}
@@ -395,7 +411,7 @@ func (e *ARM64Encoder) encodeCset(ops []string, params []Parameter) (string, err
 	return fmt.Sprintf("e.Cset(%s, int(%s))", e.regOrParam(rd, params, 0), e.condToCode(cond, params)), nil
 }
 
-func (e *ARM64Encoder) encodeCsel(ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeCsel(ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 4 {
 		return "", fmt.Errorf("invalid operands for CSEL: %v", ops)
 	}
@@ -403,7 +419,7 @@ func (e *ARM64Encoder) encodeCsel(ops []string, params []Parameter) (string, err
 	return fmt.Sprintf("e.Csel(%s, %s, %s, int(%s))", e.regOrParam(rd, params, 0), e.regOrParam(rn, params, 0), e.regOrParam(rm, params, 0), e.condToCode(cond, params)), nil
 }
 
-func (e *ARM64Encoder) condToCode(cond string, params []Parameter) string {
+func (e *ARM64Encoder) condToCode(cond string, params []template.Parameter) string {
 	if isParam(cond, params) {
 		return fmt.Sprintf("condToCode(%s)", cond)
 	}
@@ -417,7 +433,7 @@ func (e *ARM64Encoder) condToCode(cond string, params []Parameter) string {
 	return fmt.Sprintf("condToCode(\"%s\")", cond)
 }
 
-func (e *ARM64Encoder) encodeBranch(mnemonic string, ops []string, params []Parameter) (string, error) {
+func (e *ARM64Encoder) encodeBranch(mnemonic string, ops []string, params []template.Parameter) (string, error) {
 	if len(ops) != 1 {
 		return "", fmt.Errorf("invalid operands for %s: %v", mnemonic, ops)
 	}
@@ -442,8 +458,7 @@ func (e *ARM64Encoder) encodeBranch(mnemonic string, ops []string, params []Para
 	return "", fmt.Errorf("unsupported branch format: %s %v", mnemonic, ops)
 }
 
-
-func isParam(name string, params []Parameter) bool {
+func isParam(name string, params []template.Parameter) bool {
 	for _, p := range params {
 		if p.Name == name {
 			return true
@@ -460,8 +475,10 @@ func regToNum(reg string) string {
 		}
 	}
 	switch reg {
-	case "SP": return "31"
-	case "XZR": return "31"
+	case "SP":
+		return "31"
+	case "XZR":
+		return "31"
 	}
 	return reg
 }

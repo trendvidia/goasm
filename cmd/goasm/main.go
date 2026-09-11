@@ -1,9 +1,15 @@
+// Command goasm compiles goasm templates into Go emitter methods.
+//
+//	go run github.com/trendvidia/goasm/cmd/goasm@<tag> -arch arm64 -in templates/arm64.goasm -out jit/emit_arm64.go
 package main
 
 import (
 	"flag"
 	"fmt"
 	"os"
+
+	"github.com/trendvidia/goasm/gen"
+	"github.com/trendvidia/goasm/template"
 )
 
 func main() {
@@ -11,49 +17,30 @@ func main() {
 	in := flag.String("in", "", "Input template file")
 	out := flag.String("out", "", "Output Go file")
 	flag.Parse()
-
 	if *arch == "" || *in == "" || *out == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
-
-	inFile, err := os.Open(*in)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error opening input file: %v\n", err)
+	if err := run(*arch, *in, *out); err != nil {
+		fmt.Fprintln(os.Stderr, "goasm:", err)
 		os.Exit(1)
 	}
-	defer inFile.Close()
-
-	parser := NewParser(inFile)
-	templates, err := parser.Parse()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing templates: %v\n", err)
-		os.Exit(1)
-	}
-
-	var encoder Encoder
-	switch *arch {
-	case "arm64":
-		encoder = NewARM64Encoder(parser.aliases)
-	case "amd64":
-		encoder = NewAMD64Encoder(parser.aliases)
-	default:
-		fmt.Fprintf(os.Stderr, "Unsupported architecture: %s\n", *arch)
-		os.Exit(1)
-	}
-
-	outFile, err := os.Create(*out)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating output file: %v\n", err)
-		os.Exit(1)
-	}
-	defer outFile.Close()
-
-	generator := NewGenerator(*arch, encoder)
-	if err := generator.Generate(outFile, templates); err != nil {
-		fmt.Fprintf(os.Stderr, "Error generating code: %v\n", err)
-		os.Exit(1)
-	}
-
 	fmt.Printf("Generated %s from %s\n", *out, *in)
+}
+
+func run(arch, in, out string) error {
+	templates, aliases, err := template.ParseFile(in)
+	if err != nil {
+		return fmt.Errorf("parsing templates: %w", err)
+	}
+	encoder, err := gen.NewEncoder(arch, aliases)
+	if err != nil {
+		return err
+	}
+	f, err := os.Create(out)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return gen.NewGenerator(arch, encoder).Generate(f, templates)
 }

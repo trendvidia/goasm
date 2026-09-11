@@ -1,9 +1,12 @@
-package main
+// Package template parses goasm templates: "# TEMPLATE Name(params)"
+// blocks of assembly, and the "# ALIAS" register names they use.
+package template
 
 import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -20,10 +23,10 @@ type Instruction struct {
 }
 
 type Template struct {
-	Name     string
-	Params   []Parameter
-	Returns  []Parameter
-	Instrs   []Instruction
+	Name    string
+	Params  []Parameter
+	Returns []Parameter
+	Instrs  []Instruction
 }
 
 type Parser struct {
@@ -36,6 +39,24 @@ func NewParser(r io.Reader) *Parser {
 		scanner: bufio.NewScanner(r),
 		aliases: make(map[string]string),
 	}
+}
+
+// Aliases returns the "# ALIAS name = register" bindings seen by Parse.
+func (p *Parser) Aliases() map[string]string { return p.aliases }
+
+// ParseFile parses a template file and returns its templates and aliases.
+func ParseFile(path string) ([]Template, map[string]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer f.Close()
+	p := NewParser(f)
+	templates, err := p.Parse()
+	if err != nil {
+		return nil, nil, err
+	}
+	return templates, p.Aliases(), nil
 }
 
 var (
