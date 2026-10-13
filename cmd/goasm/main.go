@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
@@ -38,12 +39,13 @@ func run(arch, in, out, pkg string) error {
 	if err != nil {
 		return err
 	}
-	f, err := os.Create(out)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
+	// Generate in memory first so a failed run leaves the previous output
+	// in place rather than an empty file.
+	var buf bytes.Buffer
 	g := gen.NewGenerator(arch, encoder)
 	g.Package = pkg
-	return g.Generate(f, templates)
+	if err := g.Generate(&buf, templates); err != nil {
+		return err
+	}
+	return os.WriteFile(out, buf.Bytes(), 0o644)
 }
