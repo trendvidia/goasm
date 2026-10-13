@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
@@ -16,19 +17,20 @@ func main() {
 	arch := flag.String("arch", "", "Architecture (arm64 or amd64)")
 	in := flag.String("in", "", "Input template file")
 	out := flag.String("out", "", "Output Go file")
+	pkg := flag.String("pkg", "jit", "Package name of the output file")
 	flag.Parse()
 	if *arch == "" || *in == "" || *out == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
-	if err := run(*arch, *in, *out); err != nil {
+	if err := run(*arch, *in, *out, *pkg); err != nil {
 		fmt.Fprintln(os.Stderr, "goasm:", err)
 		os.Exit(1)
 	}
 	fmt.Printf("Generated %s from %s\n", *out, *in)
 }
 
-func run(arch, in, out string) error {
+func run(arch, in, out, pkg string) error {
 	templates, aliases, err := template.ParseFile(in)
 	if err != nil {
 		return fmt.Errorf("parsing templates: %w", err)
@@ -37,10 +39,13 @@ func run(arch, in, out string) error {
 	if err != nil {
 		return err
 	}
-	f, err := os.Create(out)
-	if err != nil {
+	// Generate in memory first so a failed run leaves the previous output
+	// in place rather than an empty file.
+	var buf bytes.Buffer
+	g := gen.NewGenerator(arch, encoder)
+	g.Package = pkg
+	if err := g.Generate(&buf, templates); err != nil {
 		return err
 	}
-	defer f.Close()
-	return gen.NewGenerator(arch, encoder).Generate(f, templates)
+	return os.WriteFile(out, buf.Bytes(), 0o644)
 }
