@@ -89,6 +89,22 @@ For amd64, the encoder maps Intel-style operands onto the same method names:
 numbers follow the x86 encoding (RAX=0 ... R15=15; XMM0-7 = 0-7). The
 `Emitter` decides what bytes each method writes.
 
+Operands are read strictly, and anything the encoder cannot place is an
+error rather than a guess:
+
+- **Immediates.** On amd64 a bare integer is an immediate, as in Intel
+  syntax: `ADD SP, 8` becomes `e.AddImm(12, 12, uint64(8))`. `#8` and `0x8`
+  mean the same. On arm64 immediates take `#`.
+- **Displacements** on amd64 are passed to `LdrImm`/`StrImm` as a count of
+  8-byte slots, a signed 32-bit value carried in a `uint32`: `[SP - 8]`
+  becomes `e.LdrImm(0, 12, 0xFFFFFFFF)`. An `Emitter` must read that
+  argument as `int32`.
+- **Wide parameters in `MOVZ`/`MOVK`.** A parameter wider than 16 bits
+  supplies the halfword at the shift, so `MOVK X25, v, LSL #16` with
+  `v uint64` becomes `e.Movk(25, uint16(v>>16), 16)`, and a
+  `MOVZ`/`MOVK` sequence over `v` builds all of `v`. A parameter of 16 bits
+  or fewer is used as the halfword itself.
+
 ## Testing
 
 - `gen/testdata/templates/*.goasm` are fixture templates that exercise
@@ -103,18 +119,11 @@ numbers follow the x86 encoding (RAX=0 ... R15=15; XMM0-7 = 0-7). The
 ## Limitations
 
 - **Branches to labels are not implemented.** Labels (`.loop:`) parse, but
-  an unconditional branch to one (`B .loop`) generates a `// TODO` comment
-  instead of a branch, on both architectures. A conditional branch to a
-  label is an error on arm64 and another `// TODO` comment on amd64. Use the
-  placeholder form and patch the offsets in Go.
-- **Some operands are miscompiled instead of rejected.** The amd64 encoder
-  passes an operand it does not recognise through unchanged, so `ADD SP, 8`
-  (no `#`) becomes `AddReg(SP, SP, 8)`, which adds register R8. Write
-  immediates with `#`.
-- **`MOVK` with a wide parameter keeps only the low 16 bits.** On arm64,
-  `MOVK X25, p, LSL #16` with `p uint64` passes `uint16(p)`, not
-  `uint16(p >> 16)`, so a `MOVZ`/`MOVK` sequence over one 64-bit parameter
-  repeats its low half. Use `MOV X25, p`, which calls `MovImm64`.
+  a branch to one is an error on both architectures. Use the placeholder
+  form and patch the offsets in Go.
+- **Memory operands are narrow on amd64**: one base register, an optional
+  index scaled by 8, and a displacement that is a multiple of 8. Anything
+  else is an error.
 - **amd64 has no reference Emitter** in this repository, so its fixture is
   checked as bytes only.
 
