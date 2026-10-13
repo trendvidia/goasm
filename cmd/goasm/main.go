@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+
 // Command goasm compiles goasm templates into Go emitter methods.
 //
 //	go run github.com/trendvidia/goasm/cmd/goasm@<tag> -arch arm64 -in templates/arm64.goasm -out jit/emit_arm64.go

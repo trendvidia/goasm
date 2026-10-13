@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+
 // Package gen turns parsed templates into Go emitter methods, one
 // architecture at a time.
 package gen
