@@ -1,29 +1,87 @@
 # goasm
 
-A code generator for JIT emitters: `# TEMPLATE Name(params)` blocks of
-assembly in `templates/*.goasm` compile to Go methods `(*Emitter).EmitName`
-in `jit/emit_<arch>.go`, one file per architecture. Design in
-[docs/goasm-design.md](docs/goasm-design.md).
+goasm turns short blocks of assembly into Go methods for a JIT compiler.
+You write each instruction pattern once, as a named template:
 
-## Using it
+```asm
+# ALIAS BP = X22
 
-Pin the tool to a tag in the consuming module and run it from `go:generate`:
+# TEMPLATE LoadSlot(slot uint8)
+    MOVZ X24, slot
+    LDR  X24, [BP, X24, LSL #3]
+```
+
+and goasm generates a typed method on your `Emitter`:
+
+```go
+func (e *Emitter) EmitLoadSlot(slot uint8) {
+	e.Movz(24, uint16(slot), 0)
+	e.LdrReg(24, 22, 24)
+}
+```
+
+Your JIT then calls `e.EmitLoadSlot(n)` instead of spelling out the
+instruction sequence by hand. Templates for arm64 and amd64 produce methods
+with the same names, so one compiler can drive both.
+
+goasm does not encode machine code itself. Each assembly line becomes a call
+to a method on an `Emitter` type that **you** provide for each architecture
+(`Movz`, `LdrReg`, `AddReg`, ...), and that method writes the bytes. goasm's
+part is the template language, register aliases, parameter substitution, and
+keeping the generated methods in step with the templates.
+
+## Status
+
+goasm was extracted from the JIT of a bytecode VM and is used there. It is
+small and young.
+
+- **arm64** is the more complete encoder. `gen/testdata/jit/emitter.go` is
+  a reference arm64 `Emitter` that the generated code compiles against.
+- **amd64** is experimental. It accepts an Intel-style syntax mixed with
+  arm64 mnemonics (`B.EQ`, `CSET`, `SBFX`), there is no reference amd64
+  `Emitter` in this repository, and there are known cases where the encoder
+  produces the wrong call instead of an error. Read the generated amd64 code
+  before you rely on it.
+- The generated file always declares `package jit`.
+
+## Usage
+
+Pin the command to a tag and run it from `go:generate` in the package that
+holds your `Emitter`:
 
 ```go
 //go:generate go run github.com/trendvidia/goasm/cmd/goasm@v1.1.0 -arch arm64 -in templates/arm64.goasm -out emit_arm64.go
 //go:generate go run github.com/trendvidia/goasm/cmd/goasm@v1.1.0 -arch amd64 -in templates/amd64.goasm -out emit_amd64.go
 ```
 
-Keep the templates in the repository that holds the generated files.
+Each output file carries a `//go:build <arch>` line, so both can sit in the
+same package next to an `Emitter` per architecture. Keep the templates in the
+repository that holds the generated files, and commit both.
+
+[docs/design.md](docs/design.md) describes the template format, how
+operands map to `Emitter` calls, and what the generator does not do yet.
 
 ## As a library
 
-- `template.ParseFile` / `template.NewParser` parse a `.goasm` file into
-  templates and register aliases.
-- `gen.NewEncoder`, `gen.NewGenerator` and `Generator.Generate` produce the
-  emitter source; `gen.MethodName` is the naming rule (`Emit` + template
-  name), exported so a consumer that links templates to generated code
-  follows it rather than a copy.
+- `template.ParseFile` (or `template.NewParser` and `Parse`) reads a
+  `.goasm` file into templates and register aliases.
+- `gen.NewEncoder`, `gen.NewGenerator` and `Generator.Generate` write the
+  Go source for one architecture.
+- `gen.MethodName` is the naming rule (`Emit` + template name), exported so
+  tools that link templates to generated code use the rule rather than a
+  copy of it.
 
-`gen`'s golden test regenerates this repository's own `jit/emit_*.go` from
-`templates/` and requires byte-identical output.
+## Development
+
+```sh
+go test ./...      # includes the golden test over gen/testdata
+go generate ./...  # regenerates gen/testdata/jit from gen/testdata/templates
+```
+
+The golden test regenerates `gen/testdata/jit/emit_*.go` from
+`gen/testdata/templates/*.goasm` and requires byte-identical output, so any
+change to generated code shows up as a fixture diff in review.
+
+## License
+
+MIT; see [LICENSE](LICENSE).
