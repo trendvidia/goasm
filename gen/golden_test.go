@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 TrendVidia, LLC.
+
 package gen_test
 
 //go:generate go run ../cmd/goasm -arch arm64 -in testdata/templates/arm64.goasm -out testdata/jit/emit_arm64.go
