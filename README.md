@@ -42,7 +42,7 @@ small and young.
   `Emitter` in this repository, and there are known cases where the encoder
   produces the wrong call instead of an error. Read the generated amd64 code
   before you rely on it.
-- The generated file always declares `package jit`.
+- The generated file declares `package jit` unless you pass `-pkg`.
 
 ## Usage
 
