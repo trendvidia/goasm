@@ -31,23 +31,24 @@ jobs:
             exit 1
           fi
 
-      # The library and the command are what this repository owns. jit/ is
-      # a sample of generated output whose Emitter is arm64-only (#1, step
-      # 3: reference or fixture is still to be decided), so it is checked
-      # by gen's golden test as bytes, not compiled here.
+      # The generated emitters and their templates are fixtures under
+      # gen/testdata: the golden test checks them as bytes, and the arm64
+      # output is type-checked against a reference Emitter on any host.
       - name: go vet
-        run: go vet ./template/... ./gen/... ./cmd/...
+        run: go vet ./...
 
-      - name: build
-        run: go build ./template/... ./gen/... ./cmd/...
+      - name: build (host, and cross-built for the other architecture)
+        run: |
+          go build ./...
+          GOARCH=arm64 go build ./...
 
-      - name: test (includes the golden check over jit/)
-        run: go test -race ./template/... ./gen/... ./cmd/...
+      - name: test (includes the golden check over gen/testdata)
+        run: go test -race ./...
 
       - name: regeneration leaves the tree unchanged
         run: |
           go generate ./...
           if ! git diff --exit-code --stat; then
-            echo "::error::go generate ./... changed committed files; regenerate and commit jit/"
+            echo "::error::go generate ./... changed committed files; regenerate and commit gen/testdata/jit/"
             exit 1
           fi
