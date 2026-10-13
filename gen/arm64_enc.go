@@ -296,29 +296,55 @@ func (e *ARM64Encoder) encodeLoadStore(mnemonic string, ops []string, params []t
 }
 
 func (e *ARM64Encoder) encodeMovz(ops []string, params []template.Parameter) (string, error) {
-	if len(ops) < 2 {
-		return "", fmt.Errorf("invalid operands for MOVZ: %v", ops)
-	}
-	rd, imm := ops[0], ops[1]
-	shift := 0
-	if len(ops) > 2 && strings.HasPrefix(ops[2], "LSL") {
-		s := strings.TrimPrefix(ops[2], "LSL #")
-		shift, _ = strconv.Atoi(s)
-	}
-	return fmt.Sprintf("e.Movz(%s, uint16(%s), %d)", e.regOrParam(rd, params, 0), strings.TrimPrefix(imm, "#"), shift), nil
+	return e.encodeMovWide("MOVZ", "Movz", ops, params)
 }
 
 func (e *ARM64Encoder) encodeMovk(ops []string, params []template.Parameter) (string, error) {
-	if len(ops) < 2 {
-		return "", fmt.Errorf("invalid operands for MOVK: %v", ops)
+	return e.encodeMovWide("MOVK", "Movk", ops, params)
+}
+
+// encodeMovWide encodes MOVZ/MOVK Rd, imm16[, LSL #shift]. A parameter
+// wider than 16 bits supplies the halfword at the shift, so a
+// MOVZ/MOVK sequence over one uint64 builds that value; a parameter of 16
+// bits or fewer is the halfword itself.
+func (e *ARM64Encoder) encodeMovWide(mnemonic, method string, ops []string, params []template.Parameter) (string, error) {
+	if len(ops) < 2 || len(ops) > 3 {
+		return "", fmt.Errorf("invalid operands for %s: %v", mnemonic, ops)
 	}
-	rd, imm := ops[0], ops[1]
+	rd, imm := ops[0], strings.TrimPrefix(ops[1], "#")
 	shift := 0
-	if len(ops) > 2 && strings.HasPrefix(ops[2], "LSL") {
-		s := strings.TrimPrefix(ops[2], "LSL #")
-		shift, _ = strconv.Atoi(s)
+	if len(ops) == 3 {
+		s, ok := strings.CutPrefix(ops[2], "LSL #")
+		n, err := strconv.Atoi(s)
+		if !ok || err != nil || n%16 != 0 || n < 0 || n > 48 {
+			return "", fmt.Errorf("%s: shift must be LSL #0, #16, #32 or #48, got %q", mnemonic, ops[2])
+		}
+		shift = n
 	}
-	return fmt.Sprintf("e.Movk(%s, uint16(%s), %d)", e.regOrParam(rd, params, 0), strings.TrimPrefix(imm, "#"), shift), nil
+	val := imm
+	if isParam(imm, params) && paramBits(imm, params) > 16 && shift > 0 {
+		val = fmt.Sprintf("%s>>%d", imm, shift)
+	}
+	return fmt.Sprintf("e.%s(%s, uint16(%s), %d)", method, e.regOrParam(rd, params, 0), val, shift), nil
+}
+
+// paramBits is the width of a parameter's Go integer type; 64 for int,
+// uint and anything not recognised.
+func paramBits(name string, params []template.Parameter) int {
+	for _, p := range params {
+		if p.Name == name {
+			switch p.Type {
+			case "int8", "uint8", "byte":
+				return 8
+			case "int16", "uint16":
+				return 16
+			case "int32", "uint32", "rune":
+				return 32
+			}
+			return 64
+		}
+	}
+	return 64
 }
 
 func (e *ARM64Encoder) encodeLogicalImm(mnemonic string, ops []string, params []template.Parameter) (string, error) {
@@ -447,7 +473,7 @@ func (e *ARM64Encoder) encodeBranch(mnemonic string, ops []string, params []temp
 		if target == "0" && retVar != "" {
 			return fmt.Sprintf("%s = e.BPlaceholder()", retVar), nil
 		}
-		return fmt.Sprintf("// TODO: Branch to %s", target), nil
+		return "", fmt.Errorf("B %s: branches to labels are not supported; use the placeholder form `B 0 -> name`", target)
 	}
 	if strings.HasPrefix(mnemonic, "B.") {
 		condStr := strings.TrimPrefix(mnemonic, "B.")

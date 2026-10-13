@@ -38,10 +38,9 @@ small and young.
 - **arm64** is the more complete encoder. `gen/testdata/jit/emitter.go` is
   a reference arm64 `Emitter` that the generated code compiles against.
 - **amd64** is experimental. It accepts an Intel-style syntax mixed with
-  arm64 mnemonics (`B.EQ`, `CSET`, `SBFX`), there is no reference amd64
-  `Emitter` in this repository, and there are known cases where the encoder
-  produces the wrong call instead of an error. Read the generated amd64 code
-  before you rely on it.
+  arm64 mnemonics (`B.EQ`, `CSET`, `SBFX`), and there is no reference
+  amd64 `Emitter` in this repository, so its output is checked as bytes
+  only. Read the generated amd64 code before you rely on it.
 - The generated file declares `package jit` unless you pass `-pkg`.
 
 ## Usage
